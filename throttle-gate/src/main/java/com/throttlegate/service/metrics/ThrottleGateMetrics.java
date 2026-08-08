@@ -39,7 +39,7 @@ public class ThrottleGateMetrics {
                 .description("Total number of requests")
                 .register(meterRegistry);
 
-        this.requestsPerSecondGauge = Gauge.builder("throttlegate.requests.per_second", this, ThrottleGateMetrics::calculateRequestsPerSecond)
+        this.requestsPerSecondGauge = Gauge.builder("throttlegate.requests.per_second", this, (obj) -> this.getRequestsPerSecond())
                 .description("Number of requests per second")
                 .register(meterRegistry);
     }
@@ -67,7 +67,7 @@ public class ThrottleGateMetrics {
      * @return allowed requests count
      */
     public long getAllowedCount() {
-        return allowedRequestsCounter.count();
+        return (long) allowedRequestsCounter.count();
     }
 
     /**
@@ -75,7 +75,7 @@ public class ThrottleGateMetrics {
      * @return denied requests count
      */
     public long getDeniedCount() {
-        return deniedRequestsCounter.count();
+        return (long) deniedRequestsCounter.count();
     }
 
     /**
@@ -83,7 +83,7 @@ public class ThrottleGateMetrics {
      * @return total requests count
      */
     public long getTotalCount() {
-        return totalRequestsCounter.count();
+        return (long) totalRequestsCounter.count();
     }
 
     /**
