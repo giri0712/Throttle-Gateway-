@@ -11,7 +11,7 @@
     <packaging>jar</packaging>
 
     <name>ThrottleGate</name>
-    <description>Distributed API Rate Limiting & Traffic Control Platform</description>
+    <description>Distributed API Rate Limiting &amp; Traffic Control Platform</description>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -49,6 +49,7 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-config</artifactId>
+            <version>2023.0.3</version>
         </dependency>
 
         <!-- Lettuce for Redis/Valkey integration -->
@@ -86,7 +87,7 @@
 
     <build>
         <plugins>
-            // Spring Boot Maven plugin
+            <!-- Spring Boot Maven plugin -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -101,7 +102,7 @@
                 </configuration>
             </plugin>
 
-            // Compiler plugin
+            <!-- Compiler plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

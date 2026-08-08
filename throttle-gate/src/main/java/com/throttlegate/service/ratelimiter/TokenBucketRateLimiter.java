@@ -1,67 +1,68 @@
 package com.throttlegate.service.ratelimiter;
 
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
+
 import java.time.Duration;
-import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Token Bucket rate limiting algorithm implementation.
+ * Token Bucket rate limiting algorithm implementation using Redis/Valkey with Lua script.
  *
  * Tokens are added at a fixed rate up to a maximum capacity.
  * Each request consumes a token. If no tokens are available, the request is rejected.
  */
 public class TokenBucketRateLimiter implements RateLimitStrategy {
 
-    // In a production environment, this would be backed by Redis/Valkey
-    // For simplicity, using ConcurrentHashMap for demonstration
-    private final ConcurrentHashMap<String, BucketState> buckets = new ConcurrentHashMap<>();
+    private static final String LUA_SCRIPT =
+            "local key = KEYS[1]" +
+                    "local capacity = tonumber(ARGV[1])" +
+                    "local refill_period = tonumber(ARGV[2])" +
+                    "local now = tonumber(ARGV[3])" +
+                    "local tokens_to_consume = tonumber(ARGV[4])" +
+
+                    "local tokens = tonumber(redis.call('HGET', key, 'tokens') or capacity)" +
+                    "local last_refill = tonumber(redis.call('HGET', key, 'last_refill') or now)" +
+
+                    "local elapsed = now - last_refill" +
+                    "if elapsed >= refill_period then" +
+                    "    local periods_elapsed = math.floor(elapsed / refill_period)" +
+                    "    local tokens_to_add = periods_elapsed * capacity" +
+                    "    tokens = math.min(capacity, tokens + tokens_to_add)" +
+                    "    last_refill = last_refill + (periods_elapsed * refill_period)" +
+                    "end" +
+
+                    "if tokens >= tokens_to_consume then" +
+                    "    tokens = tokens - tokens_to_consume" +
+                    "    redis.call('HMSET', key, 'tokens', tokens, 'last_refill', last_refill)" +
+                    "    return 1" +
+                    "else" +
+                    "    redis.call('HMSET', key, 'tokens', tokens, 'last_refill', last_refill)" +
+                    "    return 0" +
+                    "end";
+
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisScript<Long> redisScript;
+
+    public TokenBucketRateLimiter(RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+        this.redisScript = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
+    }
 
     @Override
     public boolean isAllowed(String key, int limit, Duration windowSize) {
-        BucketState state = buckets.computeIfAbsent(key, k -> new BucketState(limit, windowSize));
-        return state.tryConsume(1);
-    }
-
-    private static class BucketState {
-        private final int capacity;
-        private final Duration refillPeriod;
-        private final AtomicReference<Double> tokens;
-        private final AtomicReference<Instant> lastRefillTimestamp;
-
-        public BucketState(int capacity, Duration refillPeriod) {
-            this.capacity = capacity;
-            this.refillPeriod = refillPeriod;
-            this.tokens = new AtomicReference<>((double) capacity);
-            this.lastRefillTimestamp = new AtomicReference<>(Instant.now());
-        }
-
-        public boolean tryConsume(int tokensToConsume) {
-            refillIfNeeded();
-            double currentTokens = tokens.get();
-            if (currentTokens >= tokensToConsume) {
-                tokens.set(currentTokens - tokensToConsume);
-                return true;
-            }
-            return false;
-        }
-
-        private void refillIfNeeded() {
-            Instant now = Instant.now();
-            Instant lastRefill = lastRefillTimestamp.get();
-            Duration elapsed = Duration.between(lastRefill, now);
-
-            if (elapsed.compareTo(refillPeriod) >= 0) {
-                // Calculate how many tokens to add based on elapsed time
-                long periodsElapsed = elapsed.toSeconds() / refillPeriod.getSeconds();
-                int tokensToAdd = (int) (periodsElapsed * capacity);
-
-                if (tokensToAdd > 0) {
-                    double newTokens = Math.min(capacity, tokens.get() + tokensToAdd);
-                    tokens.set(newTokens);
-                    lastRefillTimestamp.set(lastRefill.plusSeconds(periodsElapsed * refillPeriod.getSeconds()));
-                }
-            }
-        }
+        long now = System.currentTimeMillis() / 1000; // Convert to seconds
+        Long result = redisTemplate.execute(
+                redisScript,
+                Collections.singletonList(key),
+                limit, // capacity
+                windowSize.getSeconds(), // refill_period in seconds
+                now, // current timestamp in seconds
+                1 // tokens_to_consume
+        );
+        return result == 1;
     }
 }
