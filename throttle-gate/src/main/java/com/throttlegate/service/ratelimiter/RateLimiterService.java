@@ -1,5 +1,6 @@
 package com.throttlegate.service.ratelimiter;
 
+import com.throttlegate.service.metrics.ThrottleGateMetrics;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -7,15 +8,18 @@ import java.time.Duration;
 
 /**
  * Main rate limiter service that delegates to the selected strategy.
+ * Collects metrics for allowed/denied requests.
  */
 @Service
 public class RateLimiterService {
 
     private final RateLimiterFactory rateLimiterFactory;
+    private final ThrottleGateMetrics throttleGateMetrics;
 
     @Autowired
-    public RateLimiterService(RateLimiterFactory rateLimiterFactory) {
+    public RateLimiterService(RateLimiterFactory rateLimiterFactory, ThrottleGateMetrics throttleGateMetrics) {
         this.rateLimiterFactory = rateLimiterFactory;
+        this.throttleGateMetrics = throttleGateMetrics;
     }
 
     /**
@@ -27,6 +31,12 @@ public class RateLimiterService {
      * @return              True if the request is allowed, false otherwise
      */
     public boolean isAllowed(String key, int limit, Duration windowSize) {
-        return rateLimiterFactory.getRateLimitStrategy().isAllowed(key, limit, windowSize);
+        boolean allowed = rateLimiterFactory.getRateLimitStrategy().isAllowed(key, limit, windowSize);
+        if (allowed) {
+            throttleGateMetrics.recordAllowedRequest();
+        } else {
+            throttleGateMetrics.recordDeniedRequest();
+        }
+        return allowed;
     }
 }
