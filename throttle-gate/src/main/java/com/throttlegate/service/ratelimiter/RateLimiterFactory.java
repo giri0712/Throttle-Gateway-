@@ -4,7 +4,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 
 import jakarta.annotation.PostConstruct;
 
@@ -12,6 +14,7 @@ import jakarta.annotation.PostConstruct;
  * Factory for creating rate limit strategy instances based on configuration.
  */
 @Component
+@RefreshScope
 public class RateLimiterFactory {
 
     private RateLimitStrategy rateLimitStrategy;
@@ -23,7 +26,10 @@ public class RateLimiterFactory {
     @Lazy
     private RedisTemplate<String, Object> redisTemplate;
 
-    @PostConstruct
+    /**
+     * Initializes the rate limit strategy based on the current algorithm configuration.
+     * This method is called after construction and after each configuration refresh.
+     */
     public void init() {
         switch (algorithm.toLowerCase()) {
             case "token-bucket":
@@ -38,6 +44,11 @@ public class RateLimiterFactory {
             default:
                 throw new IllegalArgumentException("Unknown rate limiting algorithm: " + algorithm);
         }
+    }
+
+    @PostConstruct
+    public void initialize() {
+        init();
     }
 
     public RateLimitStrategy getRateLimitStrategy() {

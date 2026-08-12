@@ -9,6 +9,7 @@ import java.util.Map;
 /**
  * Implementation of ThrottleGateClient using RestTemplate.
  */
+@SuppressWarnings("unchecked")
 public class ThrottleGateClientImpl implements ThrottleGateClient {
 
     private final ThrottleGateProperties properties;

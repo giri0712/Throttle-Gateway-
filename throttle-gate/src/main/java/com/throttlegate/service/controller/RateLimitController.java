@@ -1,7 +1,9 @@
 package com.throttlegate.service.controller;
 
+import com.throttlegate.service.config.RateLimitConfig;
 import com.throttlegate.service.ratelimiter.RateLimiterService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,9 @@ public class RateLimitController {
     @Autowired
     private RateLimiterService rateLimiterService;
 
+    @Autowired
+    private RateLimitConfig rateLimitConfig;
+
     /**
      * Synchronous decision endpoint for rate limiting.
      *
@@ -38,10 +43,10 @@ public class RateLimitController {
             @RequestParam String endpoint,
             @RequestParam(required = false, defaultValue = "free") String tier) {
 
-        // In a real implementation, these would come from configuration/database
-        // based on the tier and endpoint
+        // Get limit from configuration
         int limit = getLimitForTierAndEndpoint(tier, endpoint);
-        Duration windowSize = Duration.ofMinutes(1); // 1 minute window
+        // Get window size from configuration
+        Duration windowSize = Duration.ofSeconds(rateLimitConfig.getWindowSizeSeconds());
 
         // Create a unique key for this client-endpoint-tier combination
         String key = String.format("%s:%s:%s", clientId, endpoint, tier);
@@ -58,7 +63,7 @@ public class RateLimitController {
 
         if (!allowed) {
             // Set retry-after header (simplified - in practice would calculate based on algorithm)
-            headers.add(HttpHeaders.RETRY_AFTER, "60"); // 60 seconds
+            headers.add(HttpHeaders.RETRY_AFTER, String.valueOf((int) windowSize.getSeconds())); // Window size in seconds
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .headers(headers)
                     .body(responseBody);
@@ -70,22 +75,44 @@ public class RateLimitController {
     }
 
     /**
-     * Gets the rate limit based on tier and endpoint.
-     * In a real implementation, this would be fetched from a database or config service.
+     * Gets the rate limit based on tier and endpoint from configuration.
+     * Falls back to default values if not configured.
      */
     private int getLimitForTierAndEndpoint(String tier, String endpoint) {
-        // Default limits - would be configured per tenant/endpoint in real system
-        Map<String, Integer> freeTierLimits = new HashMap<>();
-        freeTierLimits.put("/events", 100); // 100 requests per minute
-        freeTierLimits.put("/payments", 10); // 10 requests per minute
-        freeTierLimits.put("/default", 50); // 50 requests per minute
+        // Get default limits from configuration
+        Map<String, Integer> defaultLimits = rateLimitConfig.getDefaultLimits();
+        
+        // If default limits are not configured, use hardcoded fallbacks
+        if (defaultLimits == null || defaultLimits.isEmpty()) {
+            Map<String, Integer> freeTierLimits = new HashMap<>();
+            freeTierLimits.put("/events", 100); // 100 requests per minute
+            freeTierLimits.put("/payments", 10); // 10 requests per minute
+            freeTierLimits.put("/default", 50); // 50 requests per minute
 
-        Map<String, Integer> proTierLimits = new HashMap<>();
-        proTierLimits.put("/events", 1000); // 1000 requests per minute
-        proTierLimits.put("/payments", 100); // 100 requests per minute
-        proTierLimits.put("/default", 500); // 500 requests per minute
+            Map<String, Integer> proTierLimits = new HashMap<>();
+            proTierLimits.put("/events", 1000); // 1000 requests per minute
+            proTierLimits.put("/payments", 100); // 100 requests per minute
+            proTierLimits.put("/default", 500); // 500 requests per minute
 
-        Map<String, Integer> limits = "pro".equalsIgnoreCase(tier) ? proTierLimits : freeTierLimits;
-        return limits.getOrDefault(endpoint, limits.getOrDefault("/default", 50));
+            Map<String, Integer> limits = "pro".equalsIgnoreCase(tier) ? proTierLimits : freeTierLimits;
+            return limits.getOrDefault(endpoint, limits.getOrDefault("/default", 50));
+        }
+        
+        // Construct the key for the specific tier:endpoint combination
+        String key = tier + ":" + endpoint;
+        Integer limit = defaultLimits.get(key);
+        
+        // If not found, try to get the default for this tier
+        if (limit == null) {
+            String defaultKey = tier + ":/default";
+            limit = defaultLimits.get(defaultKey);
+        }
+        
+        // If still not found, fall back to a reasonable default
+        if (limit == null) {
+            return 50; // Default fallback
+        }
+        
+        return limit;
     }
 }
