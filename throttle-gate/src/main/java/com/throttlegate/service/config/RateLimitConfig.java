@@ -2,6 +2,7 @@ package com.throttlegate.service.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 
 import java.util.Map;
 
@@ -10,6 +11,7 @@ import java.util.Map;
  */
 @Configuration
 @ConfigurationProperties(prefix = "throttlegate")
+@RefreshScope
 public class RateLimitConfig {
 
     /**

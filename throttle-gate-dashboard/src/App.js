@@ -20,6 +20,8 @@ function App() {
       borderWidth: 1
     }]
   });
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
     // Fetch metrics from ThrottleGate service
@@ -27,18 +29,32 @@ function App() {
       try {
         const response = await axios.get('http://localhost:8080/actuator/metrics/throttlegate.requests');
         setMetrics(response.data);
+        setError(null); // Clear error on successful fetch
+        setLastUpdate(new Date());
 
-        // Update chart data
+        // Update chart data - limit to last 30 data points to prevent memory buildup
         const now = new Date();
-        setChartData(prev => ({
-          labels: [...prev.labels, now.toLocaleTimeString()],
-          datasets: [{
-            ...prev.datasets[0],
-            data: [...prev.datasets[0].data, metrics.requestsPerSecond]
-          }]
-        }));
+        setChartData(prev => {
+          const MAX_DATA_POINTS = 30;
+          const newLabels = [...prev.labels, now.toLocaleTimeString()];
+          const newData = [...prev.datasets[0].data, metrics.requestsPerSecond];
+
+          // Keep only the last MAX_DATA_POINTS entries
+          const trimmedLabels = newLabels.slice(-MAX_DATA_POINTS);
+          const trimmedData = newData.slice(-MAX_DATA_POINTS);
+
+          return {
+            labels: trimmedLabels,
+            datasets: [{
+              ...prev.datasets[0],
+              data: trimmedData
+            }]
+          };
+        });
       } catch (error) {
         console.error('Error fetching metrics:', error);
+        setError('Failed to fetch metrics from ThrottleGate service. Please ensure the service is running on http://localhost:8080');
+        setLastUpdate(new Date());
       }
     };
 
@@ -54,6 +70,13 @@ function App() {
         <h1>ThrottleGate Admin Dashboard</h1>
         <p>Real-time API Rate Limiting Monitoring</p>
       </header>
+
+      {error && (
+        <div className="error-alert">
+          <p>{error}</p>
+          <p>Last update attempt: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Never'}</p>
+        </div>
+      )}
 
       <main>
         <div className="metrics-panel">
