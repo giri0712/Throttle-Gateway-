@@ -62,3 +62,18 @@
   margin-top: 0;
   color: #495057;
 }
+
+.error-alert {
+  background-color: #f8d7da;
+  border: 1px solid #f5c2c7;
+  color: #721c24;
+  padding: 15px;
+  margin: 20px auto;
+  max-width: 1200px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.error-alert p {
+  margin: 5px 0;
+}
