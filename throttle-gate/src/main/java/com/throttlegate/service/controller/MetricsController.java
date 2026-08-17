@@ -10,10 +10,13 @@ import java.util.Map;
 
 /**
  * REST controller for exposing ThrottleGate metrics to the admin dashboard.
- * Provides a composite metrics endpoint at /actuator/metrics/throttlegate.requests
+ * Provides a composite metrics endpoint at /api/metrics/throttlegate.requests
+ *
+ * <p>Note: this intentionally lives under /api rather than /actuator so it does not
+ * collide with the real Spring Boot Actuator endpoint that owns /actuator/metrics.</p>
  */
 @RestController
-@RequestMapping("/actuator/metrics")
+@RequestMapping("/api/metrics")
 public class MetricsController {
 
     private final ThrottleGateMetrics throttleGateMetrics;

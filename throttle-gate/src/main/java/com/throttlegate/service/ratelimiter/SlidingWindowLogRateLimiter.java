@@ -15,22 +15,23 @@ import java.util.Collections;
  */
 public class SlidingWindowLogRateLimiter implements RateLimitStrategy {
 
-    private static final String LUA_SCRIPT =
-            "local key = KEYS[1]" +
-                    "local limit = tonumber(ARGV[1])" +
-                    "local window_size = tonumber(ARGV[2])" +
-                    "local now = tonumber(ARGV[3])" +
+    private static final String LUA_SCRIPT = """
+            local key = KEYS[1]
+            local limit = tonumber(ARGV[1])
+            local window_size = tonumber(ARGV[2])
+            local now = tonumber(ARGV[3])
 
-                    "redis.call('ZREMRANGEBYSCORE', key, 0, now - window_size)" +
-                    "local current_count = redis.call('ZCARD', key)" +
+            redis.call('ZREMRANGEBYSCORE', key, 0, now - window_size)
+            local current_count = redis.call('ZCARD', key)
 
-                    "if current_count < limit then" +
-                    "    redis.call('ZADD', key, now, now)" +
-                    "    redis.call('PEXPIRE', key, window_size * 2)" +
-                    "    return 1" +
-                    "else" +
-                    "    return 0" +
-                    "end";
+            if current_count < limit then
+                redis.call('ZADD', key, now, now)
+                redis.call('PEXPIRE', key, window_size * 2)
+                return 1
+            else
+                return 0
+            end
+            """;
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisScript<Long> redisScript;
@@ -46,9 +47,9 @@ public class SlidingWindowLogRateLimiter implements RateLimitStrategy {
         Long result = redisTemplate.execute(
                 redisScript,
                 Collections.singletonList(key),
-                limit,
-                windowSize.toMillis(), // window size in milliseconds
-                now // current timestamp in milliseconds
+                String.valueOf(limit),
+                String.valueOf(windowSize.toMillis()), // window size in milliseconds
+                String.valueOf(now) // current timestamp in milliseconds
         );
         return result == 1;
     }
