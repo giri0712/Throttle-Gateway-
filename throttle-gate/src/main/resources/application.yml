@@ -1,0 +1,61 @@
+# ThrottleGate Application Configuration
+spring:
+  application:
+    name: throttle-gate
+
+  # Database Configuration
+  datasource:
+    url: jdbc:postgresql://localhost:5432/throttlegate
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  # Redis/Valkey Configuration
+  redis:
+    host: localhost
+    port: 6379
+
+  # Spring Cloud Config (for hot-reload)
+  cloud:
+    config:
+      enabled: true
+      import: "optional:configserver:"
+      uri: http://localhost:8888
+
+server:
+  port: 8080
+
+# ThrottleGate Specific Configuration
+throttlegate:
+  algorithm: token-bucket
+  window-size-seconds: 60
+  default-limits:
+    # Format: tier:endpoint -> requests per window
+    "[free:/events]": 100
+    "[free:/payments]": 10
+    "[free:/default]": 50
+    "[pro:/events]": 1000
+    "[pro:/payments]": 100
+    "[pro:/default]": 500
+  cors:
+    allowed-origins: http://localhost:3000
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    com.throttlegate: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG

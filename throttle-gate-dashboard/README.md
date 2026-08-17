@@ -1,55 +1,59 @@
 # ThrottleGate Admin Dashboard
 
-A real-time monitoring dashboard for the ThrottleGate rate limiting service.
+A real-time monitoring dashboard for the ThrottleGate rate limiting service — modern dark UI, live metrics, and interactive visualizations.
 
 ## Features
 
-- Real-time metrics display (requests/second, allowed/denied requests, allow ratio)
-- Interactive chart showing requests per second over time
-- Automatic data refresh every 5 seconds
-- Responsive design
+- **Live stat cards** — requests/second, allowed/denied counts, and allow ratio with a pulsing live indicator
+- **Throughput chart** — gradient area chart of requests per second over the last 30 samples
+- **Allow vs. deny breakdown** — doughnut chart with lifetime distribution and a center total
+- **Auto-refresh** every 5 seconds with connection-loss banner and manual retry
+- **Responsive dark theme** built with Tailwind CSS, glass-morphism cards, and staggered entrance animations
+
+## Tech Stack
+
+- React 18 + Create React App (react-scripts)
+- Tailwind CSS v3 (via PostCSS)
+- chart.js v4 + react-chartjs-2
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js 14+
-- npm or yarn
 
 ### Installation
 
-1. Clone the repository
-2. Navigate to the dashboard directory:
-   ```bash
-   cd throttle-gate-dashboard
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+cd throttle-gate-dashboard
+npm install
+```
 
 ### Running the Dashboard
 
-1. Make sure the ThrottleGate service is running on `http://localhost:8080`
+1. Make sure the ThrottleGate service is running (default: `http://localhost:8080`)
 2. Start the dashboard:
    ```bash
    npm start
    ```
 3. Open your browser to `http://localhost:3000`
 
-## API Endpoints Used
+### API Endpoint Configuration
 
-The dashboard expects the following endpoints to be available from the ThrottleGate service:
+The dashboard reads the metrics endpoint from `REACT_APP_API_URL` (defaults to `http://localhost:8080`):
 
-- `GET http://localhost:8080/actuator/metrics/throttlegate.requests` - Returns current metrics
+```bash
+REACT_APP_API_URL=http://my-host:8080 npm start
+```
 
-Note: You'll need to configure Spring Boot Actuator in your ThrottleGate service to expose these metrics.
+Endpoint used:
+
+- `GET {REACT_APP_API_URL}/api/metrics/throttlegate.requests` — returns `requestsPerSecond`, `allowedCount`, `deniedCount`, and `allowRatio`
 
 ## Customization
 
-To change the refresh rate, modify the interval in `src/App.js`:
-```javascript
-const interval = setInterval(fetchMetrics, 5000); // Change 5000 to desired milliseconds
-```
+- **Refresh rate** — change `REFRESH_INTERVAL_MS` in `src/App.js` (default 5000 ms)
+- **Chart history** — change `MAX_DATA_POINTS` in `src/App.js` (default 30 samples)
+- **Theme** — Tailwind config lives in `tailwind.config.js`; base styles in `src/index.css`
 
 ## Building for Production
 
@@ -57,4 +61,4 @@ const interval = setInterval(fetchMetrics, 5000); // Change 5000 to desired mill
 npm run build
 ```
 
-This will create a production-ready build in the `build` directory.
+This creates a production-ready build in the `build` directory.
