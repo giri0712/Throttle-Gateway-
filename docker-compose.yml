@@ -7,21 +7,24 @@ services:
       - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/throttlegate
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-throttlegate}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
       SPRING_CLOUD_CONFIG_ENABLED: "false"
+      APP_SECURITY_USERNAME: ${APP_SECURITY_USERNAME:-admin}
+      APP_SECURITY_PASSWORD: ${APP_SECURITY_PASSWORD:?Set APP_SECURITY_PASSWORD in .env}
     depends_on:
       - postgres
       - redis
     restart: unless-stopped
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15.8-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-throttlegate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: throttlegate
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -30,8 +33,8 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
-    command: redis-server --save 60 1 --loglevel warning
+    image: redis:7.2.7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env} --save 60 1 --loglevel warning
     ports:
       - "6379:6379"
     restart: unless-stopped

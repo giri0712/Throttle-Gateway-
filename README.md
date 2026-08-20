@@ -79,7 +79,7 @@ Open the dashboard at **http://localhost:3000**. It polls `http://localhost:8080
 REACT_APP_API_URL=http://my-host:8080 npm start
 ```
 
-> **Important:** `spring.cloud.config.enabled` defaults to `true` in `application.yml`. If you are not running a Spring Cloud Config server, set it to `false` (the Docker Compose setup already does) or the app will fail to boot.
+> **Note:** the Spring Cloud Config client is **disabled by default** in `application.yml` — this project does not ship a config server, so no extra setup is needed. It can be re-enabled if you deploy one (see the comments in `application.yml`).
 
 ## API Reference
 
