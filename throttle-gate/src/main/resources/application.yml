@@ -3,26 +3,31 @@ spring:
   application:
     name: throttle-gate
 
-  # Database Configuration
+  # Database Configuration — credentials must come from environment variables
   datasource:
     url: jdbc:postgresql://localhost:5432/throttlegate
-    username: postgres
-    password: postgres
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:changeme}
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
 
   # Redis/Valkey Configuration
   redis:
-    host: localhost
-    port: 6379
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:}
+    ssl: ${SPRING_REDIS_SSL:false}
 
-  # Spring Cloud Config (for hot-reload)
+  # Spring Cloud Config is OPTIONAL and DISABLED by default — this project does
+  # not ship a config server (docker-compose and the AWS plan also force
+  # SPRING_CLOUD_CONFIG_ENABLED=false). To enable hot-reload from a config server
+  # later, set enabled: true and add a TOP-LEVEL spring.config.import property,
+  # e.g. spring.config.import: "optional:configserver:".
   cloud:
     config:
-      enabled: true
-      import: "optional:configserver:"
+      enabled: false
       uri: http://localhost:8888
 
 server:
@@ -43,19 +48,27 @@ throttlegate:
   cors:
     allowed-origins: http://localhost:3000
 
-# Actuator Configuration
+# Actuator Configuration — only expose safe endpoints, require auth
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,refresh
+        include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
+  server:
+    port: 8081
+
+# Security defaults — change via env vars in production
+app:
+  security:
+    username: ${APP_SECURITY_USERNAME:admin}
+    password: ${APP_SECURITY_PASSWORD:changeme}
 
 # Logging
 logging:
   level:
     com.throttlegate: INFO
     org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: WARN

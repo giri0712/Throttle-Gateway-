@@ -5,8 +5,9 @@ import RpsLineChart from './components/RpsLineChart';
 import AllowDenyChart from './components/AllowDenyChart';
 import './index.css';
 
-// Override with REACT_APP_API_URL if the service lives elsewhere
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+// Vite uses import.meta.env instead of process.env
+// Variables must be prefixed with VITE_ to be exposed to client code
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const METRICS_URL = `${API_BASE_URL}/api/metrics/throttlegate.requests`;
 const REFRESH_INTERVAL_MS = 5000;
 const MAX_DATA_POINTS = 30;
