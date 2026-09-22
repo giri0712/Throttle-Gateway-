@@ -8,27 +8,135 @@
   }
 
   body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased;
+    @apply bg-void text-muted font-sans antialiased;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 90% 110%, rgba(139, 92, 246, 0.06), transparent);
+      radial-gradient(ellipse 90% 60% at 50% -20%, rgba(143, 176, 255, 0.06), transparent),
+      radial-gradient(ellipse 60% 45% at 85% 115%, rgba(242, 85, 85, 0.04), transparent);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
   ::selection {
-    @apply bg-cyan-400/30 text-cyan-100;
+    @apply bg-sig-blue/30 text-paper;
   }
 }
 
 @layer components {
-  .glass-card {
-    @apply rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-sm shadow-xl shadow-black/20;
+  /* --- RECON 2026 signature overlays ---------------------------------- */
+
+  /* CRT scanlines: 2px-on / 2px-off horizontal multiply stripes (fixed) */
+  .scanline-overlay::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(24, 22, 36, 0.06) 2px,
+      rgba(24, 22, 36, 0.06) 4px
+    );
   }
 
-  .stat-value {
-    @apply font-mono text-3xl font-semibold tabular-nums tracking-tight;
+  /* SVG turbulence film grain at 4.5% opacity (fixed) */
+  .noise-overlay::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9997;
+    pointer-events: none;
+    opacity: 0.045;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
+
+  /* 3px bright bar sweeping down the viewport every 6s */
+  .scanline-bar::before {
+    content: '';
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    z-index: 9997;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(245, 244, 249, 0.12), transparent);
+    animation: scanline-sweep 6s linear infinite;
+  }
+
+  /* --- Panels & terminal window chrome -------------------------------- */
+
+  /* Sharp-cornered panel: no border radius anywhere (DEFCON style) */
+  .tactical-panel {
+    @apply relative border border-edge bg-panel/60 backdrop-blur-sm;
+  }
+
+  .tactical-panel-header {
+    @apply flex items-center justify-between border-b border-edge bg-dark/60 px-3 py-2;
+  }
+
+  .panel-tag {
+    @apply font-techno text-[9px] uppercase tracking-wider2 text-faint;
+  }
+
+  /* --- Status pills (mono, square, uppercase, .2em tracking) ---------- */
+
+  .status-pill {
+    @apply inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[9px] uppercase leading-none tracking-wider2;
+    border-radius: 0;
+  }
+
+  .status-pill-dot {
+    @apply h-1 w-1 rounded-full;
+    background: currentColor;
+  }
+
+  .status-green { @apply border-sig-green/50 text-sig-green; }
+  .status-red   { @apply border-sig-red/50 text-sig-red; }
+  .status-blue  { @apply border-sig-blue/50 text-sig-blue; }
+  .status-amber { @apply border-cream/50 text-cream; }
+
+  /* --- Console buttons (sharp, mono, uppercase) ----------------------- */
+
+  .console-btn {
+    @apply inline-flex cursor-pointer items-center gap-1.5 border bg-transparent px-2.5 py-1 font-mono text-[9px] font-bold uppercase leading-none tracking-wider2 transition;
+    border-radius: 0;
+  }
+
+  .console-btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  .console-btn:focus-visible {
+    outline: 1px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  /* --- Typography helpers --------------------------------------------- */
+
+  /* Bebas Neue condensed display heading */
+  .display-heading {
+    @apply font-display tracking-wide text-paper;
+  }
+
+  /* Michroma wide techno section label */
+  .section-label {
+    @apply font-techno text-[10px] uppercase tracking-wider2 text-faint;
+  }
+
+  /* Big tabular numeric readout */
+  .stat-value {
+    @apply font-mono text-3xl font-medium tabular-nums tracking-tight text-paper;
+  }
+}
+
+/* Sweep keyframes are referenced directly by .scanline-bar::before,
+   so emit them explicitly (Tailwind only emits keyframes used via utilities). */
+@keyframes scanline-sweep {
+  0% { transform: translateY(-4px); }
+  100% { transform: translateY(100vh); }
 }
 
 /* Slim dark scrollbar */
@@ -38,15 +146,15 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #080810;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 8px;
-  border: 2px solid #0f172a;
+  background: #2a2a3d;
+  border: 2px solid #080810;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #3a3a54;
 }

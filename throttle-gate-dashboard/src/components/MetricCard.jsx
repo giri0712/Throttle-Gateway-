@@ -27,23 +27,50 @@ const ICONS = {
   )
 };
 
-export default function MetricCard({ label, value, sub, icon = 'activity', accent = 'text-cyan-400', delay = 0 }) {
+const ACCENTS = {
+  blue: {
+    text: 'text-sig-blue',
+    border: 'border-sig-blue/50',
+    bar: 'bg-sig-blue',
+  },
+  green: {
+    text: 'text-sig-green',
+    border: 'border-sig-green/50',
+    bar: 'bg-sig-green',
+  },
+  red: {
+    text: 'text-sig-red',
+    border: 'border-sig-red/50',
+    bar: 'bg-sig-red',
+  },
+  cream: {
+    text: 'text-cream',
+    border: 'border-cream/40',
+    bar: 'bg-cream',
+  },
+};
+
+export default function MetricCard({ label, value, sub, icon = 'activity', accent = 'blue', delay = 0 }) {
+  const a = ACCENTS[accent] || ACCENTS.blue;
+
   return (
     <div
-      className="glass-card group relative overflow-hidden p-5 transition duration-300 hover:border-slate-700 hover:bg-slate-900/70 animate-fade-in-up"
+      className="tactical-panel group relative overflow-hidden p-4 transition duration-300 hover:border-soft hover:bg-panel animate-fade-in-up"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-          <p className="stat-value mt-2 text-slate-50">{value}</p>
-          {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
+      {/* Top signal bar — brightens on hover */}
+      <span className={`absolute inset-x-0 top-0 h-0.5 opacity-40 transition duration-300 group-hover:opacity-100 ${a.bar}`} />
+
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="section-label">{label}</p>
+          <p className="stat-value mt-2">{value}</p>
+          {sub && <p className="mt-1 font-mono text-[10px] text-faint">{sub}</p>}
         </div>
-        <div className={`rounded-xl border border-slate-800 bg-slate-800/40 p-2.5 ${accent}`}>
+        <div className={`shrink-0 border bg-dark/60 p-2 ${a.border} ${a.text}`}>
           {ICONS[icon] || ICONS.activity}
         </div>
       </div>
-      <div className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-current to-transparent opacity-0 transition duration-300 group-hover:opacity-50 ${accent}`} />
     </div>
   );
 }

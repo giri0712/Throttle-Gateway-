@@ -45,8 +45,7 @@ public class SecurityConfig {
                 // Everything else (actuator, metrics, etc.) requires auth
                 .anyRequest().authenticated()
             )
-            .httpBasic(basic -> {})
-            .build();
+            .httpBasic(basic -> {});
 
         return http.build();
     }

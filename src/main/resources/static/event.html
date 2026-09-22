@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Details - Event Management System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="navbar">
+            <div class="logo">
+                <div>Event</div>
+                <span>Hub</span>
+            </div>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="index.html">Explore</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+            </ul>
+            <div class="auth-nav" id="auth-nav-links"></div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <div class="event-detail-container" id="event-detail-container">
+            <!-- Event Detail Loading State -->
+            <div class="loading-spinner" style="text-align: center; padding: 3rem;">
+                <div class="spinner"></div>
+                <p>Loading event details...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <p>&copy; 2026 Event Management System. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/event-detail.js"></script>
+</body>
+</html>

@@ -10,10 +10,10 @@ export default function AllowDenyChart({ allowed, denied }) {
     datasets: [
       {
         data: [allowed, denied],
-        backgroundColor: ['#10b981', '#f43f5e'],
-        borderColor: '#0f172a',
+        backgroundColor: ['#22c55e', '#f25555'],
+        borderColor: '#141426',
         borderWidth: 3,
-        hoverOffset: 6
+        hoverOffset: 4
       }
     ]
   };
@@ -26,15 +26,16 @@ export default function AllowDenyChart({ allowed, denied }) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#0f172a',
-        borderColor: 'rgba(148, 163, 184, 0.2)',
+        backgroundColor: '#141426',
+        borderColor: '#3a3a54',
         borderWidth: 1,
         padding: 10,
-        titleColor: '#e2e8f0',
-        titleFont: { family: 'Inter', weight: 600 },
-        bodyColor: '#94a3b8',
-        bodyFont: { family: 'Inter' },
-        caretSize: 6,
+        cornerRadius: 0,
+        titleColor: '#f5f4f9',
+        titleFont: { family: '"IBM Plex Mono", monospace', weight: 700, size: 11 },
+        bodyColor: '#b4adc8',
+        bodyFont: { family: '"IBM Plex Mono", monospace', size: 11 },
+        caretSize: 0,
         callbacks: {
           label: (ctx) => {
             const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0.0';
