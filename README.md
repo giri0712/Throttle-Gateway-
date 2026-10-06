@@ -42,7 +42,7 @@ A standalone rate-limiting microservice that any backend can plug into. Throttle
 ### Prerequisites
 
 - Java 17+, Maven 3.8+ (to run the service from source)
-- Node.js 14+ (to run the dashboard)
+- Node.js 18+ (to run the Vite dashboard)
 - Redis or Valkey (≥ 6) and PostgreSQL — or just use Docker Compose
 
 ### Option A — Docker Compose (easiest)
@@ -71,13 +71,19 @@ mvn spring-boot:run
 # 3. In another terminal, start the dashboard
 cd throttle-gate-dashboard
 npm install
-npm start
+npm run dev
 ```
 
-Open the dashboard at **http://localhost:3000**. It polls `http://localhost:8080/api/metrics/throttlegate.requests` by default — point it elsewhere with `REACT_APP_API_URL`:
+Open the dashboard at **http://localhost:3000**. It polls `http://localhost:8080/api/metrics/throttlegate.requests` by default — point it elsewhere with `VITE_API_URL` (Vite exposes only `VITE_*` vars to client code):
 
 ```bash
-REACT_APP_API_URL=http://my-host:8080 npm start
+VITE_API_URL=http://my-host:8080 npm run dev
+```
+
+Production build (output lands in `build/` per `vite.config.js`):
+
+```bash
+VITE_API_URL=https://api.your-host:8080 npm run build
 ```
 
 > **Note:** the Spring Cloud Config client is **disabled by default** in `application.yml` — this project does not ship a config server, so no extra setup is needed. It can be re-enabled if you deploy one (see the comments in `application.yml`).

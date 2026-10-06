@@ -65,10 +65,10 @@ The program changed **July 15, 2025**. Two possible situations:
 - [x] **Done already** — `/actuator/health` and `/api/metrics/**` are public (GET) so nginx/CloudWatch/compose probes get 200 instead of 401; actuator runs on the **same port 8080** (no second port to open in the security group).
 - [x] **Done already** — Redis-outage resilience: decisions keep being served from an in-process limiter (`throttlegate.resilience.mode`, default `fail-open`); degraded state shows in `/actuator/health` and the `throttlegate.requests.fallback` metric.
 - [x] **Done already** — all rate-limit Redis keys carry TTLs (idle clients no longer leak memory on a 1 GB instance).
-- [ ] **To do (build time):** make the dashboard API URL build-configurable so the build points at the EC2 host — the dashboard is **Vite**, so use `VITE_API_URL` and the output goes to `dist/`:
+- [ ] **To do (build time):** make the dashboard API URL build-configurable so the build points at the EC2 host — the dashboard is **Vite**, so use `VITE_API_URL`. The build output directory is **`build/`** (`build.outDir` in `vite.config.js`):
   ```bash
   cd throttle-gate-dashboard
-  VITE_API_URL=http://<EC2-PUBLIC-IP> npm run build   # output: dist/
+  VITE_API_URL=http://<EC2-PUBLIC-IP> npm run build   # output: build/
   ```
 - [x] **Done already (deploy/)** — ready-made artifacts in `deploy/`: `user-data.sh` (Phase 3), `throttlegate.service` (Phase 4), `nginx-throttlegate.conf` (Phase 6 dashboard hosting). The systemd unit sets `-Xms128m -Xmx512m` for 1 GB RAM.
 
@@ -212,11 +212,11 @@ curl -s http://localhost:8080/api/metrics/throttlegate.requests
 curl -s -I http://<EC2-IP>/
 ```
 
-**Dashboard deployment (same instance, simplest path):** the dashboard is a **Vite** app — the build output is `dist/` and the API URL env var is `VITE_API_URL` (not `REACT_APP_API_URL`/`build/`):
+**Dashboard deployment (same instance, simplest path):** the dashboard is a **Vite** app — build with `VITE_API_URL` and copy from the **`build/`** output directory (`vite.config.js` sets `build.outDir: 'build'`):
 ```bash
 cd throttle-gate-dashboard
 VITE_API_URL=http://<EC2-IP> npm run build
-scp -r -i throttlegate-key.pem dist/* ec2-user@<EC2-IP>:/usr/share/nginx/html/
+scp -r -i throttlegate-key.pem build/* ec2-user@<EC2-IP>:/usr/share/nginx/html/
 ```
 Then install the reverse proxy config so the dashboard can call the API on the same origin (no CORS issues):
 ```bash
