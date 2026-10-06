@@ -31,6 +31,36 @@ public class RateLimitConfig {
      */
     private int windowSizeSeconds = 60;
 
+    /**
+     * Behavior when Redis/Valkey is unreachable.
+     * Options: fail-open (allow requests, default), fail-closed (deny requests).
+     */
+    private Resilience resilience = new Resilience();
+
+    public Resilience getResilience() {
+        return resilience;
+    }
+
+    public void setResilience(Resilience resilience) {
+        this.resilience = resilience;
+    }
+
+    /**
+     * Resilience settings for Redis outages.
+     */
+    public static class Resilience {
+        /** fail-open allows traffic while Redis is down; fail-closed denies it. */
+        private String mode = "fail-open";
+
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+    }
+
     // Getters and setters
     public String getAlgorithm() {
         return algorithm;

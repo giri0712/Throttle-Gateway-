@@ -1,0 +1,29 @@
+# /etc/systemd/system/throttlegate.service — ThrottleGate rate limiting service
+[Unit]
+Description=ThrottleGate rate limiting service
+After=network.target postgresql.service valkey.service
+Wants=postgresql.service valkey.service
+
+[Service]
+Type=simple
+User=throttlegate
+WorkingDirectory=/opt/throttlegate/app
+ExecStart=/usr/bin/java -Xms128m -Xmx512m -XX:+UseG1GC -jar /opt/throttlegate/app/throttle-gate.jar
+Environment=SPRING_CLOUD_CONFIG_ENABLED=false
+Environment=SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/throttlegate
+Environment=SPRING_DATASOURCE_USERNAME=throttlegate
+Environment=SPRING_DATASOURCE_PASSWORD=change-me
+Environment=SPRING_REDIS_HOST=localhost
+Environment=SPRING_REDIS_PORT=6379
+Environment=THROTTLEGATE_CORS_ALLOWED_ORIGINS=http://localhost
+Environment=THROTTLEGATE_RESILIENCE_MODE=fail-open
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+# Hardened 1GB t3.micro defaults
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

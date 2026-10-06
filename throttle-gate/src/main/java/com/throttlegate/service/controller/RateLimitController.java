@@ -1,9 +1,9 @@
 package com.throttlegate.service.controller;
 
 import com.throttlegate.service.config.RateLimitConfig;
+import com.throttlegate.service.ratelimiter.RateLimitDecision;
 import com.throttlegate.service.ratelimiter.RateLimiterService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -21,11 +22,18 @@ import java.util.Map;
 @RequestMapping("/v1")
 public class RateLimitController {
 
-    @Autowired
-    private RateLimiterService rateLimiterService;
+    /** Maximum accepted length for clientId/endpoint so Redis keys stay bounded. */
+    static final int MAX_PARAM_LENGTH = 256;
+
+    private final RateLimiterService rateLimiterService;
+
+    private final RateLimitConfig rateLimitConfig;
 
     @Autowired
-    private RateLimitConfig rateLimitConfig;
+    public RateLimitController(RateLimiterService rateLimiterService, RateLimitConfig rateLimitConfig) {
+        this.rateLimiterService = rateLimiterService;
+        this.rateLimitConfig = rateLimitConfig;
+    }
 
     /**
      * Synchronous decision endpoint for rate limiting.
@@ -43,6 +51,12 @@ public class RateLimitController {
             @RequestParam String endpoint,
             @RequestParam(required = false, defaultValue = "free") String tier) {
 
+        if (isBlankOrTooLong(clientId) || isBlankOrTooLong(endpoint)) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "clientId and endpoint are required and must be at most " + MAX_PARAM_LENGTH + " characters");
+            return ResponseEntity.badRequest().body(error);
+        }
+
         // Get limit from configuration
         int limit = getLimitForTierAndEndpoint(tier, endpoint);
         // Get window size from configuration
@@ -51,19 +65,28 @@ public class RateLimitController {
         // Create a unique key for this client-endpoint-tier combination
         String key = String.format("%s:%s:%s", clientId, endpoint, tier);
 
-        boolean allowed = rateLimiterService.isAllowed(key, limit, windowSize);
+        RateLimitDecision decision = rateLimiterService.check(key, limit, windowSize);
 
-        Map<String, Object> responseBody = new HashMap<>();
-        responseBody.put("allowed", allowed);
+        Map<String, Object> responseBody = new LinkedHashMap<>();
+        responseBody.put("allowed", decision.isAllowed());
         responseBody.put("clientId", clientId);
         responseBody.put("endpoint", endpoint);
         responseBody.put("tier", tier);
+        responseBody.put("limit", decision.getLimit());
+        responseBody.put("remaining", decision.getRemaining());
+        responseBody.put("reset", decision.getResetEpochSeconds());
+        if (decision.isFallback()) {
+            responseBody.put("fallback", true);
+        }
 
         HttpHeaders headers = new HttpHeaders();
+        headers.add("X-RateLimit-Limit", String.valueOf(decision.getLimit()));
+        headers.add("X-RateLimit-Remaining", String.valueOf(decision.getRemaining()));
+        headers.add("X-RateLimit-Reset", String.valueOf(decision.getResetEpochSeconds()));
 
-        if (!allowed) {
-            // Set retry-after header (simplified - in practice would calculate based on algorithm)
-            headers.add(HttpHeaders.RETRY_AFTER, String.valueOf((int) windowSize.getSeconds())); // Window size in seconds
+        if (!decision.isAllowed()) {
+            long retryAfter = Math.max(1, decision.getRetryAfterSeconds());
+            headers.add(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter));
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .headers(headers)
                     .body(responseBody);
@@ -72,6 +95,10 @@ public class RateLimitController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(responseBody);
+    }
+
+    private boolean isBlankOrTooLong(String value) {
+        return value == null || value.isBlank() || value.length() > MAX_PARAM_LENGTH;
     }
 
     /**

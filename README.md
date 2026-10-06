@@ -20,8 +20,9 @@ A standalone rate-limiting microservice that any backend can plug into. Throttle
 
 ## Key Features
 
-- **Synchronous decision API** — `GET /v1/check` returns allow/deny instantly with a `Retry-After` header on rejection
-- **Three pluggable algorithms** — token bucket, sliding window log, sliding window counter (strategy pattern, switch via config)
+- **Synchronous decision API** — `GET /v1/check` returns allow/deny instantly with standard `X-RateLimit-*` headers and an accurate `Retry-After` (real per-key reset time from the Lua scripts) on rejection
+- **Three pluggable algorithms** — token bucket (continuous refill), sliding window log (unique-member ZSET), sliding window counter (multi-window rollover); strategy pattern, switch via config; all keys carry TTLs so Redis never leaks
+- **Redis-outage resilience** — if Redis/Valkey is unreachable the service keeps answering decisions from an in-process limiter: `fail-open` (default) or `fail-closed` via `THROTTLEGATE_RESILIENCE_MODE`; degraded state is visible in `/actuator/health` (OUT_OF_SERVICE) and the `throttlegate.requests.fallback` metric
 - **Distributed & race-free** — all algorithms run as atomic Lua scripts in Redis/Valkey; no race conditions across instances
 - **Tier-based limits** — per-client, per-endpoint, per-tier (free/pro) limits with a sensible default fallback
 - **Live admin dashboard** — requests/sec, allowed/denied counts, allow ratio, and throughput charts auto-refreshing every 5s
@@ -102,9 +103,14 @@ GET /v1/check?clientId={clientId}&endpoint={endpoint}&tier={tier}
   "allowed": true,
   "clientId": "client123",
   "endpoint": "/events",
-  "tier": "free"
+  "tier": "free",
+  "limit": 100,
+  "remaining": 99,
+  "reset": 1728204600
 }
 ```
+
+Every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (epoch seconds).
 
 **Denied** — `429 Too Many Requests` with a `Retry-After` header (seconds to wait):
 
@@ -112,14 +118,22 @@ GET /v1/check?clientId={clientId}&endpoint={endpoint}&tier={tier}
 curl -i "http://localhost:8080/v1/check?clientId=demo&endpoint=/payments&tier=free"
 
 HTTP/1.1 429
-Retry-After: 60
+Retry-After: 12
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1728204552
 {
   "allowed": false,
   "clientId": "demo",
   "endpoint": "/payments",
-  "tier": "free"
+  "tier": "free",
+  "limit": 10,
+  "remaining": 0,
+  "reset": 1728204552
 }
 ```
+
+`Retry-After` is the **real** time until this key's budget resets (not the whole window). Missing/over-long `clientId` or `endpoint` returns `400 Bad Request`.
 
 ### Metrics (used by the dashboard)
 
@@ -138,7 +152,7 @@ GET /api/metrics/throttlegate.requests
 
 ### Actuator endpoints
 
-`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`, `/actuator/refresh` (config hot-reload).
+`/actuator/health` (public, no auth — for load balancers, CloudWatch probes and compose healthchecks; shows `OUT_OF_SERVICE` with `rateLimiter=fallback (in-memory)` while running degraded), `/actuator/metrics`, `/actuator/prometheus` (auth required), `/actuator/refresh` (config hot-reload). Actuator runs on the **same port (8080)** as the API.
 
 ## Rate Limiting Algorithms
 
@@ -177,6 +191,7 @@ throttlegate:
 | `throttlegate.window-size-seconds` | `60` | Time window for limits |
 | `throttlegate.default-limits` | — | Map of `tier:endpoint` → request limit (YAML only) |
 | `throttlegate.cors.allowed-origins` | — | Comma-separated origins allowed for the dashboard |
+| `throttlegate.resilience.mode` | `fail-open` | Behavior when Redis is unreachable: `fail-open` (allow) or `fail-closed` (deny) — env: `THROTTLEGATE_RESILIENCE_MODE` |
 | `spring.redis.host` / `spring.redis.port` | `localhost:6379` | Redis/Valkey connection |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5432/throttlegate` | PostgreSQL connection |
 
@@ -224,13 +239,15 @@ See [`throttle-gate-spring-boot-starter/README.md`](throttle-gate-spring-boot-st
 ├── throttle-gate/                     # Core service (Spring Boot)
 │   ├── src/main/java/com/throttlegate/
 │   │   ├── controller/                # REST endpoints (/v1/check, /api/metrics)
-│   │   ├── ratelimiter/               # Strategy interface + 3 Lua-backed algorithms
+│   │   ├── ratelimiter/               # Strategy interface + 3 Lua-backed algorithms + fallback limiter
 │   │   ├── metrics/                   # Micrometer counters + RPS calculation
-│   │   └── config/                    # Redis, CORS, OpenAPI, rate-limit settings
+│   │   ├── health/                    # Degraded-state health indicator (Redis outage)
+│   │   └── config/                    # Redis, CORS, OpenAPI, security, rate-limit settings
 │   └── Dockerfile
 ├── throttle-gate-dashboard/           # Admin dashboard (React + Tailwind + chart.js)
 │   └── src/components/                # MetricCard, RpsLineChart, AllowDenyChart
 ├── throttle-gate-spring-boot-starter/ # Integration library for downstream services
+├── deploy/                            # EC2 user-data, systemd unit, nginx reverse proxy
 ├── docs/
 │   └── AWS_DEPLOYMENT_PLAN.md         # Step-by-step AWS Free Tier deployment plan
 └── docker-compose.yml
@@ -239,6 +256,7 @@ See [`throttle-gate-spring-boot-starter/README.md`](throttle-gate-spring-boot-st
 ## Deployment
 
 For a step-by-step AWS Free Tier deployment (EC2 + Valkey + PostgreSQL + nginx + CloudWatch), see **[`docs/AWS_DEPLOYMENT_PLAN.md`](docs/AWS_DEPLOYMENT_PLAN.md)**.
+Ready-to-use artifacts (EC2 user-data bootstrap, systemd unit, nginx reverse-proxy config, compose healthchecks) live in **[`deploy/`](deploy/)**.
 
 ## Documentation
 

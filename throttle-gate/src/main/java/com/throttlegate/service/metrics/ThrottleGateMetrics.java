@@ -19,6 +19,7 @@ public class ThrottleGateMetrics {
     private final Counter allowedRequestsCounter;
     private final Counter deniedRequestsCounter;
     private final Counter totalRequestsCounter;
+    private final Counter fallbackDecisionsCounter;
     private final Gauge requestsPerSecondGauge;
 
     // For calculating requests per second
@@ -37,6 +38,10 @@ public class ThrottleGateMetrics {
 
         this.totalRequestsCounter = Counter.builder("throttlegate.requests.total")
                 .description("Total number of requests")
+                .register(meterRegistry);
+
+        this.fallbackDecisionsCounter = Counter.builder("throttlegate.requests.fallback")
+                .description("Decisions served by the in-memory fallback because Redis was unavailable")
                 .register(meterRegistry);
 
         this.requestsPerSecondGauge = Gauge.builder("throttlegate.requests.per_second", this, (obj) -> this.getRequestsPerSecond())
@@ -76,6 +81,21 @@ public class ThrottleGateMetrics {
      */
     public long getDeniedCount() {
         return (long) deniedRequestsCounter.count();
+    }
+
+    /**
+     * Records a decision served by the in-memory fallback (Redis unavailable).
+     */
+    public void recordFallback() {
+        fallbackDecisionsCounter.increment();
+    }
+
+    /**
+     * Gets the count of fallback decisions (Redis unavailable).
+     * @return fallback decisions count
+     */
+    public long getFallbackCount() {
+        return (long) fallbackDecisionsCounter.count();
     }
 
     /**

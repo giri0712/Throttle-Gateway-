@@ -37,6 +37,8 @@ server:
 throttlegate:
   algorithm: token-bucket
   window-size-seconds: 60
+  resilience:
+    mode: ${THROTTLEGATE_RESILIENCE_MODE:fail-open}
   default-limits:
     # Format: tier:endpoint -> requests per window
     "[free:/events]": 100
@@ -48,7 +50,10 @@ throttlegate:
   cors:
     allowed-origins: http://localhost:3000
 
-# Actuator Configuration — only expose safe endpoints, require auth
+# Actuator Configuration — same port as the app: the AWS deployment plan,
+# docker-compose healthchecks and CloudWatch/nginx probes all target
+# localhost:8080/actuator/health. Splitting it onto :8081 would force every
+# probe and firewall rule to open a second port for no benefit.
 management:
   endpoints:
     web:
@@ -58,7 +63,7 @@ management:
     health:
       show-details: when_authorized
   server:
-    port: 8081
+    port: ${MANAGEMENT_PORT:8080}
 
 # Security defaults — change via env vars in production
 app:

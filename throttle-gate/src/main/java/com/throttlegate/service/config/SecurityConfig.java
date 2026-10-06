@@ -1,5 +1,6 @@
 package com.throttlegate.service.config;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -39,10 +40,20 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public: rate-limit check, Swagger/OpenAPI docs
+                // Public: rate-limit check (the core API)
                 .requestMatchers("/v1/check").permitAll()
+                // Public: dashboard metrics feed and docs
+                .requestMatchers("/api/metrics/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                // Everything else (actuator, metrics, etc.) requires auth
+                // Public: liveness probe only — protects monitoring probes and
+                // load-balancer health checks from 401s (details stay protected
+                // via management.endpoint.health.show-details=when_authorized)
+                .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                // Public: preflight for browser clients
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Forward /error responses instead of 401 on auth failures
+                .requestMatchers("/error").permitAll()
+                // Everything else (metrics mgmt, prometheus, etc.) requires auth
                 .anyRequest().authenticated()
             )
             .httpBasic(basic -> {});

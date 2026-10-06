@@ -62,13 +62,15 @@ The program changed **July 15, 2025**. Two possible situations:
 
 - [x] **Done already** — config moved to `application.yml`; app boots with `SPRING_CLOUD_CONFIG_ENABLED=false` (config server does not exist; do not enable it on EC2).
 - [x] **Done already** — rate limiter Lua scripts fixed; Redis serializer args fixed; `/v1/check` and `/api/metrics` verified working locally.
-- [ ] **To do:** make the dashboard API URL build-configurable so `npm run build` points at the EC2 host:
+- [x] **Done already** — `/actuator/health` and `/api/metrics/**` are public (GET) so nginx/CloudWatch/compose probes get 200 instead of 401; actuator runs on the **same port 8080** (no second port to open in the security group).
+- [x] **Done already** — Redis-outage resilience: decisions keep being served from an in-process limiter (`throttlegate.resilience.mode`, default `fail-open`); degraded state shows in `/actuator/health` and the `throttlegate.requests.fallback` metric.
+- [x] **Done already** — all rate-limit Redis keys carry TTLs (idle clients no longer leak memory on a 1 GB instance).
+- [ ] **To do (build time):** make the dashboard API URL build-configurable so the build points at the EC2 host — the dashboard is **Vite**, so use `VITE_API_URL` and the output goes to `dist/`:
   ```bash
-  REACT_APP_API_URL=http://<EC2-PUBLIC-IP> npm run build
+  cd throttle-gate-dashboard
+  VITE_API_URL=http://<EC2-PUBLIC-IP> npm run build   # output: dist/
   ```
-  (`src/App.js` already reads `process.env.REACT_APP_API_URL`.)
-- [ ] **To do (optional):** set JVM heap explicitly for 1 GB RAM:
-  `-Xmx256m -Xms128m -XX:+UseSerialGC` (see Phase 4 systemd unit).
+- [x] **Done already (deploy/)** — ready-made artifacts in `deploy/`: `user-data.sh` (Phase 3), `throttlegate.service` (Phase 4), `nginx-throttlegate.conf` (Phase 6 dashboard hosting). The systemd unit sets `-Xms128m -Xmx512m` for 1 GB RAM.
 
 ### 3.2 Env vars the app needs on EC2
 
@@ -76,11 +78,13 @@ The program changed **July 15, 2025**. Two possible situations:
 |---|---|---|
 | `SPRING_CLOUD_CONFIG_ENABLED` | `false` | **Critical — app won't boot without it** |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/throttlegate` | |
-| `SPRING_DATASOURCE_USERNAME` | `postgres` | |
+| `SPRING_DATASOURCE_USERNAME` | `throttlegate` | |
 | `SPRING_DATASOURCE_PASSWORD` | `<pick-one>` | |
-| `SPRING_REDIS_HOST` | `localhost` | |
+| `SPRING_REDIS_HOST` | `localhost` | Valkey on the same instance |
 | `SPRING_REDIS_PORT` | `6379` | |
 | `THROTTLEGATE_CORS_ALLOWED_ORIGINS` | dashboard origin(s) | e.g. `http://<EC2-IP>` or `https://your-domain` |
+| `THROTTLEGATE_RESILIENCE_MODE` | `fail-open` | allow (default) or deny traffic while Redis is down |
+| `APP_SECURITY_USERNAME` / `APP_SECURITY_PASSWORD` | admin creds | protects `/actuator/prometheus` etc. |
 | `SERVER_PORT` | `8080` | default |
 
 ---
@@ -170,29 +174,11 @@ mkdir -p /opt/throttlegate/app
    scp -i throttlegate-key.pem target/throttle-gate-1.0.0-SNAPSHOT.jar \
      ec2-user@<EC2-IP>:/opt/throttlegate/app/throttle-gate.jar
    ```
-3. Create `/etc/systemd/system/throttlegate.service`:
-   ```ini
-   [Unit]
-   Description=ThrottleGate rate limiting service
-   After=network.target postgresql.service valkey.service
-
-   [Service]
-   User=throttlegate
-   WorkingDirectory=/opt/throttlegate/app
-   ExecStart=/usr/bin/java -Xmx256m -Xms128m -XX:+UseSerialGC -jar throttle-gate.jar
-   Environment=SPRING_CLOUD_CONFIG_ENABLED=false
-   Environment=SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/throttlegate
-   Environment=SPRING_DATASOURCE_USERNAME=throttlegate
-   Environment=SPRING_DATASOURCE_PASSWORD=change-me
-   Environment=SPRING_REDIS_HOST=localhost
-   Environment=SPRING_REDIS_PORT=6379
-   Environment=THROTTLEGATE_CORS_ALLOWED_ORIGINS=http://<EC2-IP>
-   Restart=always
-   RestartSec=5
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
+3. Create `/etc/systemd/system/throttlegate.service` — a ready-made unit is shipped at **`deploy/throttlegate.service`** (already sets heap sizing for 1 GB RAM and `THROTTLEGATE_RESILIENCE_MODE=fail-open`); copy it and set the DB password:
+   ```bash
+   scp -i throttlegate-key.pem deploy/throttlegate.service ec2-user@<EC2-IP>:/tmp/
+   ssh -i throttlegate-key.pem ec2-user@<EC2-IP> \
+     "sudo sed -i s/change-me/<your-db-password>/ /tmp/throttlegate.service && sudo mv /tmp/throttlegate.service /etc/systemd/system/"
 4. Enable + start:
    ```bash
    sudo systemctl daemon-reload
@@ -205,8 +191,12 @@ mkdir -p /opt/throttlegate/app
 ## 7. Phase 5 — Smoke Tests (what "it works" means)
 
 ```bash
-# App is alive
+# App is alive (public — no credentials needed)
 curl -s http://localhost:8080/actuator/health            # {"status":"UP"}
+
+# Health must stay UP while Redis is briefly stopped (fail-open fallback)
+sudo systemctl stop valkey && curl -s http://localhost:8080/actuator/health && sudo systemctl start valkey
+# → {"status":"OUT_OF_SERVICE", ..."rateLimiter":"fallback (in-memory)"} while degraded
 
 # Rate limiting works (10-limit endpoint → 10x 200, then 429)
 for i in $(seq 1 12); do
@@ -222,13 +212,18 @@ curl -s http://localhost:8080/api/metrics/throttlegate.requests
 curl -s -I http://<EC2-IP>/
 ```
 
-**Dashboard deployment (same instance, simplest path):**
+**Dashboard deployment (same instance, simplest path):** the dashboard is a **Vite** app — the build output is `dist/` and the API URL env var is `VITE_API_URL` (not `REACT_APP_API_URL`/`build/`):
 ```bash
 cd throttle-gate-dashboard
-REACT_APP_API_URL=http://<EC2-IP> npm run build
-scp -r -i throttlegate-key.pem build/* ec2-user@<EC2-IP>:/usr/share/nginx/html/
+VITE_API_URL=http://<EC2-IP> npm run build
+scp -r -i throttlegate-key.pem dist/* ec2-user@<EC2-IP>:/usr/share/nginx/html/
 ```
-Enable the default nginx `server` block (AL2023 ships one serving `/usr/share/nginx/html`). The dashboard polls the API every 5 s — the CORS header from the app allows the origin you set in `THROTTLEGATE_CORS_ALLOWED_ORIGINS`.
+Then install the reverse proxy config so the dashboard can call the API on the same origin (no CORS issues):
+```bash
+scp -i throttlegate-key.pem deploy/nginx-throttlegate.conf ec2-user@<EC2-IP>:/tmp/
+ssh -i throttlegate-key.pem ec2-user@<EC2-IP> "sudo install /tmp/nginx-throttlegate.conf /etc/nginx/conf.d/throttlegate.conf && sudo nginx -t && sudo systemctl reload nginx"
+```
+With nginx proxying `/v1/`, `/api/` and `/actuator/health` to the app, build the dashboard with `VITE_API_URL=` **empty** (same-origin) and it just works.
 
 ---
 
@@ -275,7 +270,10 @@ Rough monthly costs (us-east-1, on-demand, running 24/7):
 - [x] Redis `RedisTemplate` serializes script args as **strings** — pass `String.valueOf(...)`.
 - [x] The custom metrics endpoint must **not** live under `/actuator/metrics` (real Actuator owns that path) — it's at `/api/metrics/throttlegate.requests`.
 - [x] CORS must allow the dashboard origin: `THROTTLEGATE_CORS_ALLOWED_ORIGINS`.
-- [ ] JVM heap on 1 GB: cap with `-Xmx256m`.
+- [x] `/actuator/health` must be **public** or every probe (nginx, CloudWatch, compose healthcheck) gets a 401 — now permitted for GET in `SecurityConfig`.
+- [x] Actuator stays on **8080** (was 8081) — one port to open, probes work as documented.
+- [x] Rate-limit Redis keys have TTLs — without them a 1 GB t3.micro slowly fills up.
+- [x] JVM heap on 1 GB: capped at `-Xmx512m` in `deploy/throttlegate.service`.
 - [ ] Do not expose `:8080` publicly without a reason; prefer nginx reverse proxy.
 
 ---
