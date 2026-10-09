@@ -1,12 +1,8 @@
-version: '3.8'
-
 services:
   throttle-gate:
     build: ./throttle-gate
-    ports:
-      - "8080:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\"' || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -18,6 +14,10 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      MANAGEMENT_PORT: "8080"
       SPRING_CLOUD_CONFIG_ENABLED: "false"
       APP_SECURITY_USERNAME: ${APP_SECURITY_USERNAME:-admin}
       APP_SECURITY_PASSWORD: ${APP_SECURITY_PASSWORD:?Set APP_SECURITY_PASSWORD in .env}
@@ -28,6 +28,21 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  dashboard:
+    build: ./throttle-gate-dashboard
+    ports:
+      - "8080:8080"
+    depends_on:
+      throttle-gate:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   postgres:
     image: postgres:15.8-alpine
     environment:
@@ -36,8 +51,6 @@ services:
       POSTGRES_DB: throttlegate
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-throttlegate} -d throttlegate"]
       interval: 10s
@@ -48,8 +61,8 @@ services:
   redis:
     image: redis:8.0-alpine
     command: redis-server --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env} --save 60 1 --loglevel warning
-    ports:
-      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s

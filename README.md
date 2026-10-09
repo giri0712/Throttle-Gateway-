@@ -48,16 +48,29 @@ A standalone rate-limiting microservice that any backend can plug into. Throttle
 ### Option A — Docker Compose (easiest)
 
 ```bash
-docker compose up --build
+cp .env.example .env
+# Set strong passwords in .env before starting
+docker compose up -d --build
 ```
 
-This starts all three dependencies + the service:
+This starts PostgreSQL, Redis, the API, and the dashboard. The dashboard is served without a login prompt; API routes remain protected according to the security configuration.
 
 | Service | URL |
 |---|---|
-| ThrottleGate API | `http://localhost:8080` |
-| PostgreSQL | `localhost:5432` |
-| Redis | `localhost:6379` |
+| Dashboard | `http://localhost:8080/` |
+| Rate-limit API | `http://localhost:8080/v1/check?clientId=demo&endpoint=/payments` |
+| API documentation | `http://localhost:8080/swagger-ui/index.html` |
+| Health | `http://localhost:8080/actuator/health` |
+
+Only the dashboard/reverse proxy publishes port 8080. PostgreSQL and Redis stay on the private Compose network.
+
+To deploy an update after pushing the changes to your Git remote, run this on the server from the repository directory:
+
+```bash
+git pull
+docker compose up -d --build
+docker compose ps
+```
 
 ### Option B — Run from source
 

@@ -7,7 +7,7 @@ import './index.css';
 
 // Vite uses import.meta.env instead of process.env
 // Variables must be prefixed with VITE_ to be exposed to client code
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const METRICS_URL = `${API_BASE_URL}/api/metrics/throttlegate.requests`;
 const MAX_DATA_POINTS = 30;
 const POLL_OPTIONS = [2, 5, 10, 30]; // seconds — selectable in the header
