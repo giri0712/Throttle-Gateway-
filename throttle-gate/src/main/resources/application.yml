@@ -6,8 +6,8 @@ spring:
   # Database Configuration — credentials must come from environment variables
   datasource:
     url: jdbc:postgresql://localhost:5432/throttlegate
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:changeme}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -15,9 +15,9 @@ spring:
 
   # Redis/Valkey Configuration
   redis:
-    host: ${SPRING_REDIS_HOST:localhost}
-    port: ${SPRING_REDIS_PORT:6379}
-    password: ${SPRING_REDIS_PASSWORD:}
+    host: ${SPRING_REDIS_HOST}
+    port: ${SPRING_REDIS_PORT}
+    password: ${SPRING_REDIS_PASSWORD}
     ssl: ${SPRING_REDIS_SSL:false}
 
   # Spring Cloud Config is OPTIONAL and DISABLED by default — this project does
@@ -68,8 +68,8 @@ management:
 # Security defaults — change via env vars in production
 app:
   security:
-    username: ${APP_SECURITY_USERNAME:admin}
-    password: ${APP_SECURITY_PASSWORD:changeme}
+    username: ${APP_SECURITY_USERNAME}
+    password: ${APP_SECURITY_PASSWORD}
 
 # Logging
 logging:

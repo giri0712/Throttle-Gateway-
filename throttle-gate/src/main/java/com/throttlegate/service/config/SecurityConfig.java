@@ -27,10 +27,10 @@ import org.springframework.security.web.SecurityFilterChain;
 @ConditionalOnProperty(name = "app.security.enabled", havingValue = "true", matchIfMissing = true)
 public class SecurityConfig {
 
-    @Value("${app.security.username:admin}")
+    @Value("${app.security.username}")
     private String username;
 
-    @Value("${app.security.password:changeme}")
+    @Value("${app.security.password}")
     private String password;
 
     @Bean
