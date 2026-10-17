@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.show-sql=false",
         "spring.redis.host=localhost",
+        "spring.redis.port=6379",
+        "spring.redis.password=",
         // Disable Spring Security for integration tests
         "app.security.enabled=false",
         // By default @SpringBootTest disables metric exporters for test isolation;
